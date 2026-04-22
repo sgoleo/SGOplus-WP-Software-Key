@@ -1,6 +1,6 @@
 <?php
 
-namespace SGOplus\WP_Software_Key;
+namespace SGOplus\Software_Key;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -21,7 +21,9 @@ class Database_Schema {
 		$sql[] = "CREATE TABLE $table_licenses (
 			id bigint(20) NOT NULL AUTO_INCREMENT,
 			license_key varchar(100) NOT NULL,
+			product_id varchar(50) DEFAULT '',
 			user_id bigint(20) DEFAULT 0,
+			user_email varchar(100) DEFAULT '',
 			status varchar(20) DEFAULT 'active',
 			max_domains int(11) DEFAULT 1,
 			expiry_date datetime DEFAULT NULL,
@@ -42,8 +44,10 @@ class Database_Schema {
 
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		
-		foreach ( $sql as $query ) {
-			dbDelta( $query );
+		if ( function_exists( 'dbDelta' ) ) {
+			foreach ( $sql as $query ) {
+				dbDelta( $query );
+			}
 		}
 	}
 }
