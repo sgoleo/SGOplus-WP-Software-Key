@@ -70,7 +70,7 @@ class Settings {
 							$tables = array( $wpdb->prefix . 'swk_licenses', $wpdb->prefix . 'swk_registered_domains' );
 							$all_ok = true;
 							foreach ( $tables as $table ) {
-								$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) === $table;
+								$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) === $table; // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 								$color = $exists ? '#00a32a' : '#d63638';
 								$bg = $exists ? '#f0f9f1' : '#fcf0f1';
 								$icon = $exists ? 'yes' : 'no';

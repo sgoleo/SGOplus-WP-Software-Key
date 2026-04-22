@@ -49,7 +49,7 @@ class REST_API {
 			$where .= $wpdb->prepare( " AND product_id = %s", $product_id );
 		}
 
-		$license = $wpdb->get_row( "SELECT * FROM $table_licenses $where" );
+		$license = $wpdb->get_row( "SELECT * FROM {$table_licenses} {$where}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( ! $license ) {
 			return rest_ensure_response( array( 'result' => 'error', 'message' => esc_html__( 'Invalid License Key.', 'sgoplus-software-key' ) ) );
@@ -76,7 +76,7 @@ class REST_API {
 		}
 
 		// 4. Domain Validation / Registration
-		$registered_domains = $wpdb->get_col( $wpdb->prepare( "SELECT domain_url FROM $table_domains WHERE license_id = %d", $license->id ) );
+		$registered_domains = $wpdb->get_col( $wpdb->prepare( "SELECT domain_url FROM {$table_domains} WHERE license_id = %d", intval( $license->id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$normalized_domain = trailingslashit( strtolower( $domain ) );
 		$is_registered = false;
 

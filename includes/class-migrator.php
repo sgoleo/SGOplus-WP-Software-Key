@@ -35,12 +35,13 @@ class Migrator {
 				$slm_table        = $alt_table;
 				$slm_domain_table = $wpdb->prefix . 'wp_lic_reg_domain_tbl';
 			} else {
+				/* translators: %s: Table name */
 				wp_send_json_error( array( 'message' => sprintf( esc_html__( 'Legacy SLM table not found: %s', 'sgoplus-software-key' ), $slm_table ) ) );
 			}
 		}
 
-		$total = $wpdb->get_var( "SELECT COUNT(id) FROM $slm_table" );
-		$items = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $slm_table ORDER BY id ASC LIMIT %d, %d", $offset, $limit ) );
+		$total = $wpdb->get_var( "SELECT COUNT(id) FROM {$slm_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$items = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$slm_table} ORDER BY id ASC LIMIT %d, %d", $offset, $limit ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 
 		if ( ! $items ) {
 			wp_send_json_success( array( 'complete' => true ) );
@@ -99,7 +100,7 @@ class Migrator {
 			// First, clear old domains for this license to avoid duplicates during re-migration
 			$wpdb->delete( $table_domains, array( 'license_id' => $new_license_id ) );
 
-			$domains = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM $slm_domain_table WHERE lic_key_id = %d", $item->id ) );
+			$domains = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$slm_domain_table} WHERE lic_key_id = %d", $item->id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			if ( $domains ) {
 				foreach ( $domains as $d ) {
 					$wpdb->insert( $table_domains, array(
@@ -156,7 +157,7 @@ class Migrator {
 						$.post(ajaxurl, {
 							action: 'swk_migrate_slm',
 							offset: offset,
-							nonce: '<?php echo wp_create_nonce("swk_migration_nonce"); ?>'
+							nonce: '<?php echo esc_attr( wp_create_nonce( "swk_migration_nonce" ) ); ?>'
 						}, function(res){
 							if(res.success) {
 								if(res.data.complete) {

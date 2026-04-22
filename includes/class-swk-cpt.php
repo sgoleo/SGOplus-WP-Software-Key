@@ -65,7 +65,8 @@ class CPT {
 		
 		$license = null;
 		if ( $license_id ) {
-			$license = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table WHERE id = %d", $license_id ) );
+			$table = $wpdb->prefix . 'swk_licenses';
+			$license = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", intval( $license_id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		}
 
 		// Defaults
@@ -121,7 +122,7 @@ class CPT {
 				<tr>
 					<th><label for="swk_expiry_date"><?php esc_html_e( 'Expiry Date', 'sgoplus-software-key' ); ?></label></th>
 					<td>
-						<input type="date" name="swk_expiry_date" id="swk_expiry_date" value="<?php echo esc_attr( $expiry ? date( 'Y-m-d', strtotime( $expiry ) ) : '' ); ?>">
+						<input type="date" name="swk_expiry_date" id="swk_expiry_date" value="<?php echo esc_attr( $expiry ? gmdate( 'Y-m-d', strtotime( $expiry ) ) : '' ); ?>">
 						<p class="description"><?php esc_html_e( 'Leave empty for lifetime license.', 'sgoplus-software-key' ); ?></p>
 					</td>
 				</tr>
@@ -145,7 +146,7 @@ class CPT {
 	}
 
 	public function save_license_meta( $post_id ) {
-		if ( ! isset( $_POST['swk_license_nonce'] ) || ! wp_verify_nonce( $_POST['swk_license_nonce'], 'swk_save_license' ) ) {
+		if ( ! isset( $_POST['swk_license_nonce'] ) || ! wp_verify_nonce( wp_unslash( $_POST['swk_license_nonce'] ), 'swk_save_license' ) ) {
 			return;
 		}
 
@@ -158,16 +159,16 @@ class CPT {
 		$license_id = get_post_meta( $post_id, '_swk_license_id', true );
 
 		$data = array(
-			'license_key' => sanitize_text_field( $_POST['swk_license_key'] ),
-			'product_id'  => sanitize_text_field( $_POST['swk_product_id'] ),
-			'user_email'  => sanitize_email( $_POST['swk_user_email'] ),
-			'status'      => sanitize_text_field( $_POST['swk_status'] ),
-			'max_domains' => intval( $_POST['swk_max_domains'] ),
-			'expiry_date' => ! empty( $_POST['swk_expiry_date'] ) ? sanitize_text_field( $_POST['swk_expiry_date'] ) : null,
+			'license_key' => isset( $_POST['swk_license_key'] ) ? sanitize_text_field( wp_unslash( $_POST['swk_license_key'] ) ) : '',
+			'product_id'  => isset( $_POST['swk_product_id'] ) ? sanitize_text_field( wp_unslash( $_POST['swk_product_id'] ) ) : '',
+			'user_email'  => isset( $_POST['swk_user_email'] ) ? sanitize_email( wp_unslash( $_POST['swk_user_email'] ) ) : '',
+			'status'      => isset( $_POST['swk_status'] ) ? sanitize_text_field( wp_unslash( $_POST['swk_status'] ) ) : 'active',
+			'max_domains' => isset( $_POST['swk_max_domains'] ) ? intval( wp_unslash( $_POST['swk_max_domains'] ) ) : 1,
+			'expiry_date' => ! empty( $_POST['swk_expiry_date'] ) ? sanitize_text_field( wp_unslash( $_POST['swk_expiry_date'] ) ) : null,
 		);
 
 		if ( $license_id ) {
-			$wpdb->update( $table, $data, array( 'id' => $license_id ) );
+			$wpdb->update( $table, $data, array( 'id' => intval( $license_id ) ) );
 		} else {
 			$wpdb->insert( $table, $data );
 			update_post_meta( $post_id, '_swk_license_id', $wpdb->insert_id );
@@ -194,21 +195,21 @@ class CPT {
 		
 		switch ( $column ) {
 			case 'swk_key':
-				$key = $wpdb->get_var( $wpdb->prepare( "SELECT license_key FROM $table WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) );
+				$key = $wpdb->get_var( $wpdb->prepare( "SELECT license_key FROM {$table} WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				// Fallback to title if not found via meta
 				if ( ! $key ) $key = get_the_title( $post_id );
 				echo '<code>' . esc_html( $key ) . '</code>';
 				break;
 			case 'swk_user':
-				$email = $wpdb->get_var( $wpdb->prepare( "SELECT user_email FROM $table WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) );
+				$email = $wpdb->get_var( $wpdb->prepare( "SELECT user_email FROM {$table} WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				echo esc_html( $email ? $email : '-' );
 				break;
 			case 'swk_product':
-				$pid = $wpdb->get_var( $wpdb->prepare( "SELECT product_id FROM $table WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) );
+				$pid = $wpdb->get_var( $wpdb->prepare( "SELECT product_id FROM {$table} WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				echo esc_html( $pid ? $pid : '-' );
 				break;
 			case 'swk_status':
-				$status = $wpdb->get_var( $wpdb->prepare( "SELECT status FROM $table WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) );
+				$status = $wpdb->get_var( $wpdb->prepare( "SELECT status FROM {$table} WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 				$color = ( $status === 'active' ) ? '#00a32a' : '#d63638';
 				echo '<span style="color:' . esc_attr( $color ) . '; font-weight:bold;">' . esc_html( strtoupper( $status ) ) . '</span>';
 				break;
