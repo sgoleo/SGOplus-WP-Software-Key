@@ -9,9 +9,9 @@ if ( ! defined( 'ABSPATH' ) ) {
 class REST_API {
 
 	public function register_routes() {
-		$method = class_exists( 'WP_REST_Server' ) ? \WP_REST_Server::CREATABLE : 'POST';
+		$method = class_exists( '\WP_REST_Server' ) ? \WP_REST_Server::CREATABLE : 'POST';
 		
-		register_rest_route( 'sgoplus-license/v1', '/verify', array(
+		\register_rest_route( 'sgoplus-license/v1', '/verify', array(
 			'methods'             => $method,
 			'callback'            => array( $this, 'verify_license' ),
 			'permission_callback' => '__return_true', // In production, add secret key validation
@@ -49,7 +49,13 @@ class REST_API {
 			$where .= $wpdb->prepare( " AND product_id = %s", $product_id );
 		}
 
-		$license = $wpdb->get_row( "SELECT * FROM {$table_licenses} {$where}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$cache_key = 'swk_verify_' . md5( $license_key . $product_id );
+		$license   = \wp_cache_get( $cache_key, 'swk_licenses' );
+
+		if ( false === $license ) {
+			$license = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM %i $where", $table_licenses ) );
+			\wp_cache_set( $cache_key, $license, 'swk_licenses', 300 ); // Cache for 5 mins
+		}
 
 		if ( ! $license ) {
 			return rest_ensure_response( array( 'result' => 'error', 'message' => esc_html__( 'Invalid License Key.', 'sgoplus-software-key' ) ) );
@@ -76,7 +82,7 @@ class REST_API {
 		}
 
 		// 4. Domain Validation / Registration
-		$registered_domains = $wpdb->get_col( $wpdb->prepare( "SELECT domain_url FROM {$table_domains} WHERE license_id = %d", intval( $license->id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$registered_domains = $wpdb->get_col( $wpdb->prepare( "SELECT domain_url FROM %i WHERE license_id = %d", $table_domains, \intval( $license->id ) ) );
 		$normalized_domain = trailingslashit( strtolower( $domain ) );
 		$is_registered = false;
 
@@ -100,9 +106,9 @@ class REST_API {
 			return rest_ensure_response( array( 'result' => 'error', 'message' => esc_html__( 'Domain not registered.', 'sgoplus-software-key' ) ) );
 		}
 
-		return rest_ensure_response( array(
+		return \rest_ensure_response( array(
 			'result'  => 'success',
-			'message' => esc_html__( 'License verified.', 'sgoplus-software-key' ),
+			'message' => \esc_html__( 'License verified.', 'sgoplus-software-key' ),
 			'data'    => array( 'expiry' => $license->expiry_date, 'status' => $license->status, 'product_id' => $license->product_id ),
 		) );
 	}

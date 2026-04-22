@@ -40,8 +40,14 @@ class Migrator {
 			}
 		}
 
-		$total = $wpdb->get_var( "SELECT COUNT(id) FROM {$slm_table}" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$items = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$slm_table} ORDER BY id ASC LIMIT %d, %d", $offset, $limit ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$cache_key_total = 'swk_slm_total_' . md5( $slm_table );
+		$total = \wp_cache_get( $cache_key_total, 'swk_migration' );
+		if ( false === $total ) {
+			$total = $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(id) FROM %i", $slm_table ) );
+			\wp_cache_set( $cache_key_total, $total, 'swk_migration', 60 );
+		}
+
+		$items = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM %i ORDER BY id ASC LIMIT %d, %d", $slm_table, $offset, $limit ) );
 
 		if ( ! $items ) {
 			wp_send_json_success( array( 'complete' => true ) );
@@ -100,7 +106,7 @@ class Migrator {
 			// First, clear old domains for this license to avoid duplicates during re-migration
 			$wpdb->delete( $table_domains, array( 'license_id' => $new_license_id ) );
 
-			$domains = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM {$slm_domain_table} WHERE lic_key_id = %d", $item->id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$domains = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM %i WHERE lic_key_id = %d", $slm_domain_table, $item->id ) );
 			if ( $domains ) {
 				foreach ( $domains as $d ) {
 					$wpdb->insert( $table_domains, array(

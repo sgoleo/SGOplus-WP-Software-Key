@@ -65,8 +65,13 @@ class CPT {
 		
 		$license = null;
 		if ( $license_id ) {
-			$table = $wpdb->prefix . 'swk_licenses';
-			$license = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE id = %d", intval( $license_id ) ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$cache_key = 'swk_license_' . $license_id;
+			$license = \wp_cache_get( $cache_key, 'swk_licenses' );
+			
+			if ( false === $license ) {
+				$license = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$wpdb->prefix}swk_licenses WHERE id = %d", \intval( $license_id ) ) );
+				\wp_cache_set( $cache_key, $license, 'swk_licenses' );
+			}
 		}
 
 		// Defaults
@@ -146,7 +151,7 @@ class CPT {
 	}
 
 	public function save_license_meta( $post_id ) {
-		if ( ! isset( $_POST['swk_license_nonce'] ) || ! wp_verify_nonce( wp_unslash( $_POST['swk_license_nonce'] ), 'swk_save_license' ) ) {
+		if ( ! isset( $_POST['swk_license_nonce'] ) || ! \wp_verify_nonce( \sanitize_text_field( \wp_unslash( $_POST['swk_license_nonce'] ) ), 'swk_save_license' ) ) {
 			return;
 		}
 
@@ -168,10 +173,12 @@ class CPT {
 		);
 
 		if ( $license_id ) {
-			$wpdb->update( $table, $data, array( 'id' => intval( $license_id ) ) );
+			$wpdb->update( $table, $data, array( 'id' => \intval( $license_id ) ) );
+			\wp_cache_delete( 'swk_license_' . $license_id, 'swk_licenses' );
 		} else {
 			$wpdb->insert( $table, $data );
-			update_post_meta( $post_id, '_swk_license_id', $wpdb->insert_id );
+			$new_id = $wpdb->insert_id;
+			\update_post_meta( $post_id, '_swk_license_id', $new_id );
 		}
 	}
 
@@ -195,23 +202,39 @@ class CPT {
 		
 		switch ( $column ) {
 			case 'swk_key':
-				$key = $wpdb->get_var( $wpdb->prepare( "SELECT license_key FROM {$table} WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$key = \wp_cache_get( 'swk_key_' . $post_id, 'swk_licenses' );
+				if ( false === $key ) {
+					$key = $wpdb->get_var( $wpdb->prepare( "SELECT license_key FROM {$wpdb->prefix}swk_licenses WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) );
+					\wp_cache_set( 'swk_key_' . $post_id, $key, 'swk_licenses' );
+				}
 				// Fallback to title if not found via meta
-				if ( ! $key ) $key = get_the_title( $post_id );
-				echo '<code>' . esc_html( $key ) . '</code>';
+				if ( ! $key ) $key = \get_the_title( $post_id );
+				echo '<code>' . \esc_html( $key ) . '</code>';
 				break;
 			case 'swk_user':
-				$email = $wpdb->get_var( $wpdb->prepare( "SELECT user_email FROM {$table} WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				echo esc_html( $email ? $email : '-' );
+				$email = \wp_cache_get( 'swk_user_' . $post_id, 'swk_licenses' );
+				if ( false === $email ) {
+					$email = $wpdb->get_var( $wpdb->prepare( "SELECT user_email FROM {$wpdb->prefix}swk_licenses WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) );
+					\wp_cache_set( 'swk_user_' . $post_id, $email, 'swk_licenses' );
+				}
+				echo \esc_html( $email ? $email : '-' );
 				break;
 			case 'swk_product':
-				$pid = $wpdb->get_var( $wpdb->prepare( "SELECT product_id FROM {$table} WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-				echo esc_html( $pid ? $pid : '-' );
+				$pid = \wp_cache_get( 'swk_pid_' . $post_id, 'swk_licenses' );
+				if ( false === $pid ) {
+					$pid = $wpdb->get_var( $wpdb->prepare( "SELECT product_id FROM {$wpdb->prefix}swk_licenses WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) );
+					\wp_cache_set( 'swk_pid_' . $post_id, $pid, 'swk_licenses' );
+				}
+				echo \esc_html( $pid ? $pid : '-' );
 				break;
 			case 'swk_status':
-				$status = $wpdb->get_var( $wpdb->prepare( "SELECT status FROM {$table} WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+				$status = \wp_cache_get( 'swk_status_' . $post_id, 'swk_licenses' );
+				if ( false === $status ) {
+					$status = $wpdb->get_var( $wpdb->prepare( "SELECT status FROM {$wpdb->prefix}swk_licenses WHERE id = (SELECT meta_value FROM {$wpdb->postmeta} WHERE post_id = %d AND meta_key = '_swk_license_id')", $post_id ) );
+					\wp_cache_set( 'swk_status_' . $post_id, $status, 'swk_licenses' );
+				}
 				$color = ( $status === 'active' ) ? '#00a32a' : '#d63638';
-				echo '<span style="color:' . esc_attr( $color ) . '; font-weight:bold;">' . esc_html( strtoupper( $status ) ) . '</span>';
+				echo '<span style="color:' . \esc_attr( $color ) . '; font-weight:bold;">' . \esc_html( \strtoupper( (string)$status ) ) . '</span>';
 				break;
 		}
 	}

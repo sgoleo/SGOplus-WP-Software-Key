@@ -27,7 +27,7 @@ class Database_Schema {
 			status varchar(20) DEFAULT 'active',
 			max_domains int(11) DEFAULT 1,
 			expiry_date datetime DEFAULT NULL,
-			created_at datetime DEFAULT CURRENT_TIMESTAMP,
+			created_at datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
 			PRIMARY KEY  (id),
 			UNIQUE KEY license_key (license_key)
 		) $charset_collate;";
@@ -37,7 +37,7 @@ class Database_Schema {
 			id bigint(20) NOT NULL AUTO_INCREMENT,
 			license_id bigint(20) NOT NULL,
 			domain_url varchar(255) NOT NULL,
-			registered_at datetime DEFAULT CURRENT_TIMESTAMP,
+			registered_at datetime NOT NULL DEFAULT '0000-00-00 00:00:00',
 			PRIMARY KEY  (id),
 			KEY license_id (license_id)
 		) $charset_collate;";
@@ -46,7 +46,7 @@ class Database_Schema {
 		
 		if ( function_exists( 'dbDelta' ) ) {
 			foreach ( $sql as $query ) {
-				dbDelta( $query );
+				\dbDelta( $query );
 			}
 		}
 	}

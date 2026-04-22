@@ -74,8 +74,8 @@ final class Bootstrap {
 	 * Initialize hooks
 	 */
 	private function init_hooks() {
-		register_activation_hook( __FILE__, array( $this, 'activate' ) );
-		add_action( 'init', array( $this, 'init' ) );
+		\register_activation_hook( __FILE__, array( $this, 'activate' ) );
+		\add_action( 'init', array( $this, 'init' ) );
 	}
 
 	/**
@@ -95,7 +95,7 @@ final class Bootstrap {
 		
 		// Initialize REST API
 		$api = new REST_API();
-		add_action( 'rest_api_init', array( $api, 'register_routes' ) );
+		\add_action( 'rest_api_init', array( $api, 'register_routes' ) );
 
 		// Initialize Settings
 		new Settings();
@@ -106,4 +106,4 @@ final class Bootstrap {
 }
 
 // Initialize the plugin
-Bootstrap::get_instance();
+\SGOplus\Software_Key\Bootstrap::get_instance();
