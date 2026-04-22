@@ -70,13 +70,18 @@ class Settings {
 							$tables = array( $wpdb->prefix . 'swk_licenses', $wpdb->prefix . 'swk_registered_domains' );
 							$all_ok = true;
 							foreach ( $tables as $table ) {
-								$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) === $table; // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+								$cache_key = 'swk_table_exists_' . md5( $table );
+								$exists = \wp_cache_get( $cache_key, 'swk_system' );
+								if ( false === $exists ) {
+									$exists = $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $table ) ) === $table;
+									\wp_cache_set( $cache_key, $exists, 'swk_system', 3600 ); // Cache for 1 hour
+								}
 								$color = $exists ? '#00a32a' : '#d63638';
 								$bg = $exists ? '#f0f9f1' : '#fcf0f1';
 								$icon = $exists ? 'yes' : 'no';
-								echo '<div style="display: flex; align-items: center; gap: 15px; padding: 18px 25px; border-radius: 12px; background: ' . esc_attr( $bg ) . '; border: 1px solid ' . esc_attr( $exists ? '#e1f0e4' : '#f5e1e2' ) . '; transition: all 0.3s ease;">';
-								echo '<span class="dashicons dashicons-' . esc_attr( $icon ) . '" style="color: ' . esc_attr( $color ) . '; font-size: 22px; width: 22px; height: 22px;"></span>';
-								echo '<code style="background: transparent; color: #333; font-weight: 700; font-size: 1.1em; word-break: break-all;">' . esc_html( $table ) . '</code>';
+								echo '<div style="display: flex; align-items: center; gap: 15px; padding: 18px 25px; border-radius: 12px; background: ' . \esc_attr( $bg ) . '; border: 1px solid ' . \esc_attr( $exists ? '#e1f0e4' : '#f5e1e2' ) . '; transition: all 0.3s ease;">';
+								echo '<span class="dashicons dashicons-' . \esc_attr( $icon ) . '" style="color: ' . \esc_attr( $color ) . '; font-size: 22px; width: 22px; height: 22px;"></span>';
+								echo '<code style="background: transparent; color: #333; font-weight: 700; font-size: 1.1em; word-break: break-all;">' . \esc_html( $table ) . '</code>';
 								echo '</div>';
 								if ( ! $exists ) $all_ok = false;
 							}
