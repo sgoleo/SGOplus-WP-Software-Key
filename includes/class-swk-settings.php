@@ -14,9 +14,9 @@ class Settings {
 	}
 
 	public function register_settings() {
-		register_setting( 'swk_settings_group', 'swk_secret_key' );
-		register_setting( 'swk_settings_group', 'swk_default_product_id' );
-		register_setting( 'swk_settings_group', 'swk_license_prefix' );
+		register_setting( 'swk_settings_group', 'swk_secret_key', array( 'sanitize_callback' => 'sanitize_text_field' ) );
+		register_setting( 'swk_settings_group', 'swk_default_product_id', array( 'sanitize_callback' => 'sanitize_text_field' ) );
+		register_setting( 'swk_settings_group', 'swk_license_prefix', array( 'sanitize_callback' => 'sanitize_text_field' ) );
 	}
 
 	public function add_settings_page() {
