@@ -1,4 +1,4 @@
-# Workspace Rules - WP-Share-Service
+# Workspace Rules - SGOplus Software Key
 
 本文件定義了此專案開發時必須嚴格遵守的規範。
 
