@@ -58,6 +58,11 @@ register_activation_hook( __FILE__, array( __NAMESPACE__ . '\\DB_Schema', 'insta
  * Initialize Plugin
  */
 function init_plugin() {
+	// Initialize Migration Engine
+	if ( is_admin() ) {
+		new Migration_Engine();
+	}
+
 	// Initialize core components here in future steps
 }
 add_action( 'plugins_loaded', __NAMESPACE__ . '\\init_plugin' );
