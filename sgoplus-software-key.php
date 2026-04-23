@@ -17,58 +17,56 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 // Define constants
-define( 'SGOPLUS_SWK_VERSION', '1.0.0' );
+define( 'SGOPLUS_SWK_VERSION', '1.0.1' );
 define( 'SGOPLUS_SWK_PATH', plugin_dir_path( __FILE__ ) );
 define( 'SGOPLUS_SWK_URL', plugin_dir_url( __FILE__ ) );
 
 /**
- * Autoloader (Simple PSR-4 style for internal use)
+ * Manual Class Loading with Defensive Checks
  */
-spl_autoload_register( function ( $class ) {
-	$prefix = 'SGOplus\\SoftwareKey\\';
-	$base_dir = SGOPLUS_SWK_PATH . 'includes/';
+$sgoplus_swk_files = array(
+	'includes/class-db-schema.php',
+	'includes/libraries/class-wp-async-request.php',
+	'includes/libraries/class-wp-background-process.php',
+	'includes/class-migration-worker.php',
+	'includes/class-migration-engine.php',
+	'includes/class-rest-api.php',
+	'includes/class-admin-dashboard.php',
+);
 
-	$len = strlen( $prefix );
-	if ( strncmp( $prefix, $class, $len ) !== 0 ) {
-		return;
+foreach ( $sgoplus_swk_files as $file ) {
+	$path = SGOPLUS_SWK_PATH . $file;
+	if ( file_exists( $path ) ) {
+		require_once $path;
 	}
-
-	$relative_class = substr( $class, $len );
-	
-	// Convert namespace to file path
-	$parts = explode( '\\', $relative_class );
-	$class_name = array_pop( $parts );
-	$path = strtolower( implode( '/', $parts ) );
-	
-	$file = $base_dir . ( $path ? $path . '/' : '' ) . 'class-' . strtolower( str_replace( '_', '-', $class_name ) ) . '.php';
-
-	if ( file_exists( $file ) ) {
-		require_once $file;
-	}
-} );
+}
 
 /**
  * Activation Logic
  */
-register_activation_hook( __FILE__, array( 'SGOplus\\SoftwareKey\\DB_Schema', 'install' ) );
+register_activation_hook( __FILE__, function() {
+	if ( class_exists( 'SGOplus\\SoftwareKey\\DB_Schema' ) ) {
+		\SGOplus\SoftwareKey\DB_Schema::install();
+	}
+} );
 
 /**
  * Initialize Plugin
  */
 function sgoplus_swk_init_plugin() {
 	// Initialize Migration Engine
-	if ( is_admin() ) {
-		new SGOplus\SoftwareKey\Migration_Engine();
+	if ( is_admin() && class_exists( 'SGOplus\\SoftwareKey\\Migration_Engine' ) ) {
+		new \SGOplus\SoftwareKey\Migration_Engine();
 	}
 
 	// Initialize REST API
-	new SGOplus\SoftwareKey\REST_API();
-
-	// Initialize Admin Dashboard
-	if ( is_admin() ) {
-		new SGOplus\SoftwareKey\Admin_Dashboard();
+	if ( class_exists( 'SGOplus\\SoftwareKey\\REST_API' ) ) {
+		new \SGOplus\SoftwareKey\REST_API();
 	}
 
-	// Initialize core components here in future steps
+	// Initialize Admin Dashboard
+	if ( class_exists( 'SGOplus\\SoftwareKey\\Admin_Dashboard' ) ) {
+		new \SGOplus\SoftwareKey\Admin_Dashboard();
+	}
 }
 add_action( 'plugins_loaded', 'sgoplus_swk_init_plugin' );

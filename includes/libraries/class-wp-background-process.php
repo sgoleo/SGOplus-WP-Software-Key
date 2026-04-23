@@ -209,12 +209,17 @@ abstract class WP_Background_Process extends WP_Async_Request {
 	/**
 	 * Convert human readable memory to bytes.
 	 *
-	 * @param string $value Value.
+	 * @param string|int $value Value.
 	 *
 	 * @return int
 	 */
 	protected function convert_hr_to_bytes( $value ) {
+		$value = (string) $value;
 		$value = trim( $value );
+		if ( empty( $value ) ) {
+			return 0;
+		}
+		
 		$last  = strtolower( $value[ strlen( $value ) - 1 ] );
 		$value = intval( $value );
 

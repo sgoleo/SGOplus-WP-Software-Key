@@ -29,14 +29,61 @@ class Admin_Dashboard {
 	 * Add Menu Page
 	 */
 	public function add_menu_page() {
+		// 1. Main Menu (Parent)
 		add_menu_page(
 			__( 'SGOplus Software Key', 'sgoplus-software-key' ),
-			__( 'Software Key', 'sgoplus-software-key' ),
+			__( 'Software Key+', 'sgoplus-software-key' ),
 			'manage_options',
 			'sgoplus-swk-dashboard',
 			array( $this, 'render_dashboard' ),
 			'dashicons-shield-lock',
-			25
+			26
+		);
+
+		// 2. Submenus
+		add_submenu_page(
+			'sgoplus-swk-dashboard',
+			__( 'Licenses - Software Key+', 'sgoplus-software-key' ),
+			__( 'Licenses', 'sgoplus-software-key' ),
+			'manage_options',
+			'sgoplus-swk-dashboard',
+			array( $this, 'render_dashboard' )
+		);
+
+		add_submenu_page(
+			'sgoplus-swk-dashboard',
+			__( 'Add New - Software Key+', 'sgoplus-software-key' ),
+			__( 'Add New', 'sgoplus-software-key' ),
+			'manage_options',
+			'sgoplus-swk-dashboard&view=add-new',
+			array( $this, 'render_dashboard' )
+		);
+
+		add_submenu_page(
+			'sgoplus-swk-dashboard',
+			__( 'Logs - Software Key+', 'sgoplus-software-key' ),
+			__( 'Activation Logs', 'sgoplus-software-key' ),
+			'manage_options',
+			'sgoplus-swk-dashboard&view=logs',
+			array( $this, 'render_dashboard' )
+		);
+
+		add_submenu_page(
+			'sgoplus-swk-dashboard',
+			__( 'Settings - Software Key+', 'sgoplus-software-key' ),
+			__( 'Settings', 'sgoplus-software-key' ),
+			'manage_options',
+			'sgoplus-swk-dashboard&view=settings',
+			array( $this, 'render_dashboard' )
+		);
+
+		add_submenu_page(
+			'sgoplus-swk-dashboard',
+			__( 'Guide - Software Key+', 'sgoplus-software-key' ),
+			__( 'Guide', 'sgoplus-software-key' ),
+			'manage_options',
+			'sgoplus-swk-dashboard&view=guide',
+			array( $this, 'render_dashboard' )
 		);
 	}
 
