@@ -13,37 +13,48 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 /**
  * Class Admin_Dashboard
- * Handles the React-based admin interface asset enqueueing.
  */
 class Admin_Dashboard {
 
 	/**
-	 * Constructor — registers the enqueue hook at the correct time.
+	 * Our menu page slugs.
+	 */
+	private static $slugs = array(
+		'sgoplus-swk-dashboard',
+		'sgoplus-swk-dashboard-add',
+		'sgoplus-swk-dashboard-logs',
+		'sgoplus-swk-dashboard-settings',
+		'sgoplus-swk-dashboard-guide',
+	);
+
+	/**
+	 * Constructor
 	 */
 	public function __construct() {
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_assets' ) );
 	}
 
 	/**
+	 * Check if the current page is one of ours.
+	 * Reads the 'page' query parameter directly — the most reliable method,
+	 * independent of WordPress hook-suffix generation quirks.
+	 *
+	 * @return bool
+	 */
+	private function is_our_page() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+
+		return in_array( $page, self::$slugs, true );
+	}
+
+	/**
 	 * Enqueue Assets
 	 *
-	 * Called by admin_enqueue_scripts with the current page hook suffix.
-	 * This is the ONLY correct place to call wp_enqueue_script/style.
-	 *
-	 * @param string $hook_suffix Current admin page hook suffix provided by WP.
+	 * @param string $hook_suffix Current admin page hook suffix (unused — we use is_our_page()).
 	 */
 	public function enqueue_assets( $hook_suffix ) {
-		/*
-		 * WordPress generates hook suffixes as follows:
-		 *   Top-level page  → toplevel_page_{menu-slug}
-		 *   Sub-pages       → {sanitized-parent-menu-title}_page_{submenu-slug}
-		 *
-		 * Menu title "Software Key+" sanitises to "software-key-2" or similar,
-		 * so we match by slug pattern instead of hard-coding the parent title.
-		 *
-		 * Strategy: match any hook that contains our menu slug.
-		 */
-		if ( strpos( $hook_suffix, 'sgoplus-swk-dashboard' ) === false ) {
+		if ( ! $this->is_our_page() ) {
 			return;
 		}
 
@@ -55,62 +66,93 @@ class Admin_Dashboard {
 			add_action(
 				'admin_notices',
 				static function () {
-					echo '<div class="notice notice-warning"><p>' .
-						esc_html__( 'SGOplus Software Key: Frontend assets not built. Run ', 'sgoplus-software-key' ) .
-						'<code>npm run build</code>.</p></div>';
+					echo '<div class="notice notice-error"><p><strong>SGOplus Software Key:</strong> ' .
+						esc_html__( 'Frontend assets not found. Please reinstall the plugin.', 'sgoplus-software-key' ) .
+						'</p></div>';
 				}
 			);
 			return;
 		}
 
 		// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
-		$manifest = json_decode( file_get_contents( $manifest_file ), true );
+		$raw      = file_get_contents( $manifest_file );
+		$manifest = json_decode( $raw, true );
 
-		if ( ! is_array( $manifest ) || ! isset( $manifest['src/main.tsx'] ) ) {
+		if ( ! is_array( $manifest ) ) {
 			return;
 		}
 
-		$entry = $manifest['src/main.tsx'];
+		// ── Locate JS entry ───────────────────────────────────────────────────
+		$js_file = null;
+		foreach ( $manifest as $item ) {
+			if ( is_array( $item ) && ! empty( $item['isEntry'] ) && ! empty( $item['file'] ) ) {
+				$js_file = $item['file'];
+				break;
+			}
+		}
 
-		// Enqueue JS.
+		// Fallback: look for main.js directly.
+		if ( null === $js_file && file_exists( $dist_path . 'assets/main.js' ) ) {
+			$js_file = 'assets/main.js';
+		}
+
+		if ( null === $js_file ) {
+			return;
+		}
+
+		// ── Enqueue JS ───────────────────────────────────────────────────────
 		wp_enqueue_script(
 			'sgoplus-swk-admin',
-			$dist_url . $entry['file'],
+			$dist_url . $js_file,
 			array(),
 			SGOPLUS_SWK_VERSION,
 			true
 		);
 
-		// Vite builds ES modules — add type="module" to the script tag.
-		add_filter(
-			'script_loader_tag',
-			static function ( $tag, $handle ) {
-				if ( 'sgoplus-swk-admin' !== $handle ) {
-					return $tag;
-				}
-				// Avoid double-adding the attribute.
-				if ( strpos( $tag, 'type="module"' ) !== false ) {
-					return $tag;
-				}
-				return str_replace( '<script ', '<script type="module" ', $tag );
-			},
-			10,
-			2
-		);
+		// ── Locate and enqueue CSS ────────────────────────────────────────────
+		$css_enqueued = false;
 
-		// Enqueue CSS.
-		if ( ! empty( $entry['css'] ) ) {
-			foreach ( $entry['css'] as $css_file ) {
-				wp_enqueue_style(
-					'sgoplus-swk-admin-' . md5( $css_file ),
-					$dist_url . $css_file,
-					array(),
-					SGOPLUS_SWK_VERSION
-				);
+		// Strategy 1: entry-level css array (ESM builds).
+		foreach ( $manifest as $item ) {
+			if ( is_array( $item ) && ! empty( $item['isEntry'] ) && ! empty( $item['css'] ) ) {
+				foreach ( $item['css'] as $i => $css_file ) {
+					wp_enqueue_style(
+						'sgoplus-swk-admin-css-' . $i,
+						$dist_url . $css_file,
+						array(),
+						SGOPLUS_SWK_VERSION
+					);
+					$css_enqueued = true;
+				}
 			}
 		}
 
-		// Provide REST API root + nonce to the React app via inline JS.
+		// Strategy 2: top-level manifest keys ending in .css (IIFE builds).
+		if ( ! $css_enqueued ) {
+			foreach ( $manifest as $item ) {
+				if ( is_array( $item ) && ! empty( $item['file'] ) && substr( $item['file'], -4 ) === '.css' ) {
+					wp_enqueue_style(
+						'sgoplus-swk-admin-css',
+						$dist_url . $item['file'],
+						array(),
+						SGOPLUS_SWK_VERSION
+					);
+					$css_enqueued = true;
+				}
+			}
+		}
+
+		// Strategy 3: direct file fallback.
+		if ( ! $css_enqueued && file_exists( $dist_path . 'assets/style.css' ) ) {
+			wp_enqueue_style(
+				'sgoplus-swk-admin-css',
+				$dist_url . 'assets/style.css',
+				array(),
+				SGOPLUS_SWK_VERSION
+			);
+		}
+
+		// ── Provide data to React app ─────────────────────────────────────────
 		wp_localize_script(
 			'sgoplus-swk-admin',
 			'sgoplusSwkData',

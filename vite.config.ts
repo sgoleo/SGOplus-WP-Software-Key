@@ -8,10 +8,20 @@ export default defineConfig({
   build: {
     outDir: 'assets/dist',
     manifest: true,
+    emptyOutDir: true,
+    cssCodeSplit: false,  // Emit a single CSS file for the whole bundle.
     rollupOptions: {
       input: resolve(__dirname, 'src/main.tsx'),
+      output: {
+        // IIFE: self-contained, no import/export — works with wp_enqueue_script.
+        format: 'iife',
+        inlineDynamicImports: true,
+        // Predictable filenames so the manifest stays stable.
+        entryFileNames: 'assets/main.js',
+        chunkFileNames: 'assets/[name].js',
+        assetFileNames: 'assets/[name].[ext]',
+      },
     },
-    emptyOutDir: true,
   },
   server: {
     cors: true,
