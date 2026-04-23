@@ -11,6 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once __DIR__ . '/class-wp-async-request.php';
+
 /**
  * Abstract WP_Background_Process class.
  *

@@ -11,7 +11,6 @@
  * Requires PHP: 7.4
  */
 
-namespace SGOplus\SoftwareKey;
 
 if ( ! defined( 'ABSPATH' ) ) {
 	exit;
@@ -26,7 +25,7 @@ define( 'SGOPLUS_SWK_URL', plugin_dir_url( __FILE__ ) );
  * Autoloader (Simple PSR-4 style for internal use)
  */
 spl_autoload_register( function ( $class ) {
-	$prefix = __NAMESPACE__ . '\\';
+	$prefix = 'SGOplus\\SoftwareKey\\';
 	$base_dir = SGOPLUS_SWK_PATH . 'includes/';
 
 	$len = strlen( $prefix );
@@ -37,40 +36,39 @@ spl_autoload_register( function ( $class ) {
 	$relative_class = substr( $class, $len );
 	
 	// Convert namespace to file path
-	// Example: SGOplus\SoftwareKey\Libraries\WP_Async_Request -> libraries/class-wp-async-request.php
 	$parts = explode( '\\', $relative_class );
 	$class_name = array_pop( $parts );
-	$path = strtolower( implode( DIRECTORY_SEPARATOR, $parts ) );
+	$path = strtolower( implode( '/', $parts ) );
 	
-	$file = $base_dir . ( $path ? $path . DIRECTORY_SEPARATOR : '' ) . 'class-' . strtolower( str_replace( '_', '-', $class_name ) ) . '.php';
+	$file = $base_dir . ( $path ? $path . '/' : '' ) . 'class-' . strtolower( str_replace( '_', '-', $class_name ) ) . '.php';
 
 	if ( file_exists( $file ) ) {
-		require $file;
+		require_once $file;
 	}
 } );
 
 /**
  * Activation Logic
  */
-register_activation_hook( __FILE__, array( __NAMESPACE__ . '\\DB_Schema', 'install' ) );
+register_activation_hook( __FILE__, array( 'SGOplus\\SoftwareKey\\DB_Schema', 'install' ) );
 
 /**
  * Initialize Plugin
  */
-function init_plugin() {
+function sgoplus_swk_init_plugin() {
 	// Initialize Migration Engine
 	if ( is_admin() ) {
-		new Migration_Engine();
+		new SGOplus\SoftwareKey\Migration_Engine();
 	}
 
 	// Initialize REST API
-	new REST_API();
+	new SGOplus\SoftwareKey\REST_API();
 
 	// Initialize Admin Dashboard
 	if ( is_admin() ) {
-		new Admin_Dashboard();
+		new SGOplus\SoftwareKey\Admin_Dashboard();
 	}
 
 	// Initialize core components here in future steps
 }
-add_action( 'plugins_loaded', __NAMESPACE__ . '\\init_plugin' );
+add_action( 'plugins_loaded', 'sgoplus_swk_init_plugin' );
