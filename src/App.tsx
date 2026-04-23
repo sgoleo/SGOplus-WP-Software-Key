@@ -9,8 +9,13 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const view = params.get('view') || 'licenses';
-    setCurrentView(view);
+    const page = params.get('page') || 'sgoplus-swk-dashboard';
+    
+    if (page.includes('logs')) setCurrentView('logs');
+    else if (page.includes('settings')) setCurrentView('settings');
+    else if (page.includes('add')) setCurrentView('add-new');
+    else if (page.includes('guide')) setCurrentView('guide');
+    else setCurrentView('licenses');
   }, []);
 
   const renderContent = () => {
