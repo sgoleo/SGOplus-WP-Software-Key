@@ -1,5 +1,6 @@
 import React from 'react';
 import { LayoutDashboard, Key, History, Settings, ShieldCheck } from 'lucide-react';
+import LicenseDataView from './components/LicenseDataView';
 
 const App: React.FC = () => {
   return (
@@ -35,20 +36,7 @@ const App: React.FC = () => {
         ))}
       </div>
 
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8 text-center py-20">
-        <div className="max-w-md mx-auto">
-          <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-6">
-            <Settings className="text-blue-500 animate-spin-slow" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Ready for Modernization</h2>
-          <p className="text-gray-500 mb-8">
-            The frontend environment is initialized. Next, we will implement the DataViews API for advanced license filtering and management.
-          </p>
-          <button className="bg-gray-900 text-white px-6 py-3 rounded-xl font-medium hover:bg-gray-800 transition-colors">
-            Get Started
-          </button>
-        </div>
-      </div>
+      <LicenseDataView />
     </div>
   );
 };

@@ -62,6 +62,22 @@ class REST_API extends WP_REST_Controller {
 		) );
 
 		// 2. Internal: License Management (Dashboard)
+		register_rest_route( $this->namespace, '/licenses', array(
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_licenses' ),
+				'permission_callback' => array( $this, 'check_internal_permission' ),
+				'args'                => array(
+					'per_page' => array( 'default' => 20, 'sanitize_callback' => 'absint' ),
+					'page'     => array( 'default' => 1, 'sanitize_callback' => 'absint' ),
+					'search'   => array( 'sanitize_callback' => 'sanitize_text_field' ),
+					'status'   => array( 'sanitize_callback' => 'sanitize_text_field' ),
+					'orderby'  => array( 'default' => 'id', 'sanitize_callback' => 'sanitize_text_field' ),
+					'order'    => array( 'default' => 'desc', 'sanitize_callback' => 'sanitize_text_field' ),
+				),
+			),
+		) );
+
 		register_rest_route( $this->namespace, '/licenses/(?P<id>\d+)', array(
 			array(
 				'methods'             => WP_REST_Server::EDITABLE,
@@ -164,6 +180,62 @@ class REST_API extends WP_REST_Controller {
 			'success' => true,
 			'message' => 'License activated successfully.',
 		), 200 );
+	}
+
+	/**
+	 * Callback: Get Licenses List (Internal)
+	 */
+	public function get_licenses( $request ) {
+		global $wpdb;
+		$table = $wpdb->prefix . DB_Schema::LICENSES_TABLE;
+
+		$per_page = $request->get_param( 'per_page' );
+		$page     = $request->get_param( 'page' );
+		$search   = $request->get_param( 'search' );
+		$status   = $request->get_param( 'status' );
+		$orderby  = $request->get_param( 'orderby' );
+		$order    = $request->get_param( 'order' );
+
+		$offset = ( $page - 1 ) * $per_page;
+
+		$where = ' WHERE 1=1';
+		$params = array();
+
+		if ( ! empty( $search ) ) {
+			$where .= ' AND (license_key LIKE %s OR customer_email LIKE %s OR customer_name LIKE %s)';
+			$search_val = '%' . $wpdb->esc_like( $search ) . '%';
+			$params[] = $search_val;
+			$params[] = $search_val;
+			$params[] = $search_val;
+		}
+
+		if ( ! empty( $status ) ) {
+			$where .= ' AND status = %s';
+			$params[] = $status;
+		}
+
+		// Valid columns for orderby
+		$allowed_orderby = array( 'id', 'license_key', 'created_at', 'status', 'activation_count' );
+		if ( ! in_array( $orderby, $allowed_orderby ) ) {
+			$orderby = 'id';
+		}
+		$order = strtoupper( $order ) === 'ASC' ? 'ASC' : 'DESC';
+
+		$query = "SELECT * FROM $table $where ORDER BY $orderby $order LIMIT %d OFFSET %d";
+		$params[] = $per_page;
+		$params[] = $offset;
+
+		$results = $wpdb->get_results( $wpdb->prepare( $query, $params ) );
+		
+		// Get total count for pagination headers
+		$total_query = "SELECT COUNT(*) FROM $table $where";
+		$total = $wpdb->get_var( $wpdb->prepare( $total_query, array_slice( $params, 0, count( $params ) - 2 ) ) );
+
+		$response = new WP_REST_Response( $results, 200 );
+		$response->header( 'X-WP-Total', (int) $total );
+		$response->header( 'X-WP-TotalPages', ceil( $total / $per_page ) );
+
+		return $response;
 	}
 
 	/**
