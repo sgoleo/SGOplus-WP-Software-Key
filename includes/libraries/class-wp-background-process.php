@@ -11,7 +11,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-require_once __DIR__ . '/class-wp-async-request.php';
+// Note: WP_Async_Request is required by the main plugin loader BEFORE this file,
+// so we do NOT require it again here to avoid duplicate class declaration errors.
 
 /**
  * Abstract WP_Background_Process class.
@@ -69,11 +70,15 @@ abstract class WP_Background_Process extends WP_Async_Request {
 	/**
 	 * Dispatch background process.
 	 *
+	 * Saves the current data queue snapshot and fires the async request.
+	 *
 	 * @return array|\WP_Error
 	 */
 	public function dispatch() {
-		// Create a snapshot of the queue.
-		$this->save();
+		// Only save if data is present; parent::dispatch() handles the HTTP call.
+		if ( ! empty( $this->data ) ) {
+			$this->save();
+		}
 
 		return parent::dispatch();
 	}
@@ -138,7 +143,6 @@ abstract class WP_Background_Process extends WP_Async_Request {
 		}
 
 		$this->save();
-		$this->memory_exceeded();
 
 		if ( ! empty( $this->data ) ) {
 			$this->dispatch();
@@ -214,25 +218,28 @@ abstract class WP_Background_Process extends WP_Async_Request {
 	 * @return int
 	 */
 	protected function convert_hr_to_bytes( $value ) {
-		$value = (string) $value;
-		$value = trim( $value );
+		$value = trim( (string) $value );
 		if ( empty( $value ) ) {
 			return 0;
 		}
-		
-		$last  = strtolower( $value[ strlen( $value ) - 1 ] );
-		$value = intval( $value );
 
+		$last  = strtolower( $value[ strlen( $value ) - 1 ] );
+		$bytes = intval( $value );
+
+		// Use explicit breaks to avoid PHP 8+ fallthrough deprecation.
 		switch ( $last ) {
 			case 'g':
-				$value *= 1024;
+				$bytes *= 1024 * 1024 * 1024;
+				break;
 			case 'm':
-				$value *= 1024;
+				$bytes *= 1024 * 1024;
+				break;
 			case 'k':
-				$value *= 1024;
+				$bytes *= 1024;
+				break;
 		}
 
-		return $value;
+		return $bytes;
 	}
 
 	/**
@@ -264,7 +271,11 @@ abstract class WP_Background_Process extends WP_Async_Request {
 		if ( ! isset( $schedules[ $this->cron_interval_identifier ] ) ) {
 			$schedules[ $this->cron_interval_identifier ] = array(
 				'interval' => $interval * 60,
-				'display'  => sprintf( __( 'Every %d Minutes', 'sgoplus-software-key' ), $interval ),
+				'display'  => sprintf(
+					/* translators: %d: interval in minutes */
+					__( 'Every %d Minutes', 'sgoplus-software-key' ),
+					$interval
+				),
 			);
 		}
 
@@ -320,5 +331,4 @@ abstract class WP_Background_Process extends WP_Async_Request {
 	protected function clear_scheduled_event() {
 		wp_clear_scheduled_hook( $this->cron_hook_identifier );
 	}
-
 }

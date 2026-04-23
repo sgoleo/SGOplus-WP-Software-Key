@@ -21,38 +21,34 @@ class Admin_Dashboard {
 	 * Constructor
 	 */
 	public function __construct() {
-		// Enqueueing is now handled manually by the Plugin class or via hooks
-	}
-
-	/**
-	 * Render Dashboard Container
-	 */
-	public function render_dashboard() {
-		echo '<div id="sgoplus-swk-admin-root"></div>';
-	}
-
-	/**
-	 * Render Dashboard Container
-	 */
-	public function render_dashboard() {
-		echo '<div id="sgoplus-swk-admin-root"></div>';
+		// Enqueueing is now handled manually by the Plugin class via render_dashboard().
 	}
 
 	/**
 	 * Enqueue Assets
+	 *
+	 * @param string $hook Current admin page hook suffix.
 	 */
 	public function enqueue_assets( $hook ) {
-		if ( 'toplevel_page_sgoplus-swk-dashboard' !== $hook ) {
+		// Allow all sub-pages of the sgoplus-swk-dashboard slug to load assets.
+		$allowed_hooks = array(
+			'toplevel_page_sgoplus-swk-dashboard',
+			'software-key_page_sgoplus-swk-dashboard-add',
+			'software-key_page_sgoplus-swk-dashboard-logs',
+			'software-key_page_sgoplus-swk-dashboard-settings',
+			'software-key_page_sgoplus-swk-dashboard-guide',
+		);
+
+		if ( ! in_array( $hook, $allowed_hooks, true ) ) {
 			return;
 		}
 
-		$dist_path = SGOPLUS_SWK_PATH . 'assets/dist/';
-		$dist_url  = SGOPLUS_SWK_URL . 'assets/dist/';
+		$dist_path     = SGOPLUS_SWK_PATH . 'assets/dist/';
+		$dist_url      = SGOPLUS_SWK_URL . 'assets/dist/';
 		$manifest_file = $dist_path . '.vite/manifest.json';
 
-		// In development mode, you might want to load from Vite dev server
-		// For now, we assume a production build exists or we provide a fallback
 		if ( file_exists( $manifest_file ) ) {
+			// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents
 			$manifest = json_decode( file_get_contents( $manifest_file ), true );
 
 			if ( isset( $manifest['src/main.tsx'] ) ) {
@@ -80,16 +76,25 @@ class Admin_Dashboard {
 				}
 			}
 		} else {
-			// Fallback or Dev mode message
-			add_action( 'admin_notices', function() {
-				echo '<div class="notice notice-warning"><p>SGOplus Software Key: Frontend assets not built. Please run <code>npm run build</code>.</p></div>';
-			} );
+			// Fallback notice when the frontend hasn't been built yet.
+			add_action(
+				'admin_notices',
+				static function () {
+					echo '<div class="notice notice-warning"><p>' .
+						esc_html__( 'SGOplus Software Key: Frontend assets not built. Please run ', 'sgoplus-software-key' ) .
+						'<code>npm run build</code>.</p></div>';
+				}
+			);
 		}
 
 		// Localize Script for API access
-		wp_localize_script( 'sgoplus-swk-admin', 'sgoplusSwkData', array(
-			'root'  => esc_url_raw( rest_url( 'sgoplus-swk/v1' ) ),
-			'nonce' => wp_create_nonce( 'wp_rest' ),
-		) );
+		wp_localize_script(
+			'sgoplus-swk-admin',
+			'sgoplusSwkData',
+			array(
+				'root'  => esc_url_raw( rest_url( 'sgoplus-swk/v1' ) ),
+				'nonce' => wp_create_nonce( 'wp_rest' ),
+			)
+		);
 	}
 }

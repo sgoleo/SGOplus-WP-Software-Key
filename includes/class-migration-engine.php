@@ -29,26 +29,34 @@ class Migration_Engine {
 	 */
 	public function __construct() {
 		$this->worker = new Migration_Worker();
-		
-		// Hook into admin init to check if migration is needed (for demo/manual trigger)
+
+		// Hook into admin init to check if migration is needed.
 		add_action( 'admin_init', array( $this, 'maybe_start_migration' ) );
 	}
 
 	/**
-	 * Check and start migration if requested.
+	 * Check and start migration if requested, with nonce verification.
 	 */
 	public function maybe_start_migration() {
 		if ( ! is_admin() || ! current_user_can( 'manage_options' ) ) {
 			return;
 		}
 
-		if ( isset( $_GET['sgoplus_start_migration'] ) && '1' === $_GET['sgoplus_start_migration'] ) {
-			$this->start_migration();
-			
-			// Redirect back to avoid multiple triggers
-			wp_safe_redirect( remove_query_arg( 'sgoplus_start_migration' ) );
-			exit;
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( ! isset( $_GET['sgoplus_start_migration'] ) || '1' !== $_GET['sgoplus_start_migration'] ) {
+			return;
 		}
+
+		// Nonce must be present and valid.
+		if ( ! isset( $_GET['_wpnonce'] ) || ! wp_verify_nonce( sanitize_key( wp_unslash( $_GET['_wpnonce'] ) ), 'sgoplus_start_migration' ) ) {
+			wp_die( esc_html__( 'Security check failed.', 'sgoplus-software-key' ) );
+		}
+
+		$this->start_migration();
+
+		// Redirect back to avoid multiple triggers.
+		wp_safe_redirect( remove_query_arg( array( 'sgoplus_start_migration', '_wpnonce' ) ) );
+		exit;
 	}
 
 	/**
@@ -58,26 +66,27 @@ class Migration_Engine {
 		global $wpdb;
 
 		$legacy_table = $wpdb->prefix . 'lic_key_tbl';
-		
-		// Check if legacy table exists
-		if ( $wpdb->get_var( $wpdb->prepare( "SHOW TABLES LIKE %s", $legacy_table ) ) !== $legacy_table ) {
+
+		// Check if legacy table exists.
+		// phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.LikeWildcardsInQuery
+		if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $legacy_table ) ) !== $legacy_table ) {
 			return;
 		}
 
-		// Get all legacy IDs
-		$ids = $wpdb->get_col( "SELECT id FROM $legacy_table ORDER BY id ASC" );
+		// phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$ids = $wpdb->get_col( "SELECT id FROM {$legacy_table} ORDER BY id ASC" );
 
 		if ( empty( $ids ) ) {
 			update_option( 'sgoplus_swk_migration_completed', time() );
 			return;
 		}
 
-		// Push to worker queue
+		// Push to worker queue.
 		foreach ( $ids as $id ) {
 			$this->worker->push_to_queue( $id );
 		}
 
-		// Dispatch the worker
+		// Dispatch the worker.
 		$this->worker->save()->dispatch();
 	}
 
@@ -88,7 +97,7 @@ class Migration_Engine {
 	 */
 	public function get_status() {
 		$is_completed = get_option( 'sgoplus_swk_migration_completed' );
-		
+
 		return array(
 			'completed' => (bool) $is_completed,
 			'timestamp' => $is_completed,

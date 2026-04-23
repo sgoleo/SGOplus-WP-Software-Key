@@ -25,22 +25,25 @@ final class Plugin {
 
 	/**
 	 * Instance
-	 * @var Plugin
+	 *
+	 * @var Plugin|null
 	 */
-	private static $instance;
+	private static $instance = null;
 
 	/**
-	 * Get Instance
+	 * Get Instance (singleton)
+	 *
+	 * @return Plugin
 	 */
 	public static function get_instance() {
-		if ( ! isset( self::$instance ) ) {
+		if ( null === self::$instance ) {
 			self::$instance = new self();
 		}
 		return self::$instance;
 	}
 
 	/**
-	 * Constructor
+	 * Constructor — load constants and files immediately; hooks on plugins_loaded.
 	 */
 	private function __construct() {
 		$this->define_constants();
@@ -52,13 +55,22 @@ final class Plugin {
 	 * Define Constants
 	 */
 	private function define_constants() {
-		define( 'SGOPLUS_SWK_VERSION', '1.0.9' );
-		define( 'SGOPLUS_SWK_PATH', plugin_dir_path( __FILE__ ) );
-		define( 'SGOPLUS_SWK_URL', plugin_dir_url( __FILE__ ) );
+		if ( ! defined( 'SGOPLUS_SWK_VERSION' ) ) {
+			define( 'SGOPLUS_SWK_VERSION', '1.0.9' );
+		}
+		if ( ! defined( 'SGOPLUS_SWK_PATH' ) ) {
+			define( 'SGOPLUS_SWK_PATH', plugin_dir_path( __FILE__ ) );
+		}
+		if ( ! defined( 'SGOPLUS_SWK_URL' ) ) {
+			define( 'SGOPLUS_SWK_URL', plugin_dir_url( __FILE__ ) );
+		}
 	}
 
 	/**
 	 * Include Files
+	 *
+	 * All class files are loaded here so that the activation hook
+	 * (which runs after includes()) can safely reference DB_Schema::install.
 	 */
 	private function includes() {
 		require_once SGOPLUS_SWK_PATH . 'includes/class-db-schema.php';
@@ -74,9 +86,13 @@ final class Plugin {
 	 * Initialize Hooks
 	 */
 	private function init_hooks() {
+		// Activation hook — DB_Schema is already loaded via includes().
 		register_activation_hook( __FILE__, array( __NAMESPACE__ . '\\DB_Schema', 'install' ) );
-		
+
+		// Defer component initialisation until all plugins are loaded.
 		add_action( 'plugins_loaded', array( $this, 'init_plugin' ) );
+
+		// Admin menu registration must happen on admin_menu, not plugins_loaded.
 		add_action( 'admin_menu', array( $this, 'register_admin_menu' ), 99 );
 	}
 
@@ -96,8 +112,8 @@ final class Plugin {
 		$cap  = 'manage_options';
 
 		add_menu_page(
-			'SGOplus Software Key',
-			'Software Key+',
+			__( 'SGOplus Software Key', 'sgoplus-software-key' ),
+			__( 'Software Key+', 'sgoplus-software-key' ),
 			$cap,
 			$slug,
 			array( $this, 'render_dashboard' ),
@@ -105,26 +121,35 @@ final class Plugin {
 			26
 		);
 
-		add_submenu_page( $slug, 'Licenses', 'Licenses', $cap, $slug, array( $this, 'render_dashboard' ) );
-		add_submenu_page( $slug, 'Add New', 'Add New', $cap, $slug . '-add', array( $this, 'render_dashboard' ) );
-		add_submenu_page( $slug, 'Logs', 'Activation Logs', $cap, $slug . '-logs', array( $this, 'render_dashboard' ) );
-		add_submenu_page( $slug, 'Settings', 'Settings', $cap, $slug . '-settings', array( $this, 'render_dashboard' ) );
-		add_submenu_page( $slug, 'Guide', 'Guide', $cap, $slug . '-guide', array( $this, 'render_dashboard' ) );
+		add_submenu_page( $slug, __( 'Licenses', 'sgoplus-software-key' ),         __( 'Licenses', 'sgoplus-software-key' ),         $cap, $slug,                    array( $this, 'render_dashboard' ) );
+		add_submenu_page( $slug, __( 'Add New', 'sgoplus-software-key' ),          __( 'Add New', 'sgoplus-software-key' ),          $cap, $slug . '-add',            array( $this, 'render_dashboard' ) );
+		add_submenu_page( $slug, __( 'Activation Logs', 'sgoplus-software-key' ),  __( 'Activation Logs', 'sgoplus-software-key' ),  $cap, $slug . '-logs',           array( $this, 'render_dashboard' ) );
+		add_submenu_page( $slug, __( 'Settings', 'sgoplus-software-key' ),         __( 'Settings', 'sgoplus-software-key' ),         $cap, $slug . '-settings',       array( $this, 'render_dashboard' ) );
+		add_submenu_page( $slug, __( 'Guide', 'sgoplus-software-key' ),            __( 'Guide', 'sgoplus-software-key' ),            $cap, $slug . '-guide',          array( $this, 'render_dashboard' ) );
 	}
 
 	/**
 	 * Render Dashboard
+	 *
+	 * Outputs the React mount point and enqueues frontend assets.
 	 */
 	public function render_dashboard() {
 		echo '<div id="sgoplus-swk-admin-root"></div>';
-		
+
 		$dashboard = new Admin_Dashboard();
-		$screen = get_current_screen();
+		$screen    = \get_current_screen();
 		$dashboard->enqueue_assets( $screen ? $screen->id : 'toplevel_page_sgoplus-swk-dashboard' );
 	}
 }
 
 /**
- * Initialize the Plugin
+ * Initialize the Plugin on plugins_loaded to guarantee WordPress is fully
+ * bootstrapped before any class is instantiated.
  */
-Plugin::get_instance();
+add_action(
+	'plugins_loaded',
+	static function () {
+		Plugin::get_instance();
+	},
+	1 // Priority 1 — run before other plugins_loaded callbacks.
+);
