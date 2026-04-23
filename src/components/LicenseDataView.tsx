@@ -129,36 +129,42 @@ const LicenseDataView: React.FC = () => {
     }, [isLoading]);
 
     return (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden" style={{ height: '700px', overflowY: 'auto' }} onScroll={onScroll}>
-            <div className="p-6 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
-                <h2 className="text-lg font-bold text-gray-900">License Key Overview</h2>
+        <div className="bg-white rounded-[2.5rem] shadow-sm border border-gray-100 overflow-hidden animate-fade-in">
+            <div className="p-10 border-b border-gray-50 flex justify-between items-center bg-gray-50/30">
+                <div>
+                    <h2 className="text-2xl font-bold text-gray-900">License Key Overview</h2>
+                    <p className="text-gray-500">Manage, monitor, and revoke software licenses.</p>
+                </div>
                 <div className="flex gap-2">
-                    <Button variant="secondary" onClick={() => setView((prev: any) => ({ ...prev, page: 1 }))}>Refresh</Button>
+                    <Button variant="secondary" onClick={() => setView((prev: any) => ({ ...prev, page: 1 }))} className="rounded-xl px-6 py-2 h-auto font-bold border-gray-200">Refresh</Button>
                 </div>
             </div>
 
-            <DataViews
-                data={data}
-                fields={fields}
-                view={view}
-                onChangeView={setView}
-                actions={actions}
-                // @ts-ignore
-                layouts={layouts}
-            />
+            <div className="p-4">
+                <DataViews
+                    data={data}
+                    fields={fields}
+                    view={view}
+                    onChangeView={setView}
+                    actions={actions}
+                    // @ts-ignore
+                    layouts={layouts}
+                />
+            </div>
 
             {isLoading && (
-                <div className="p-8 text-center">
+                <div className="p-12 text-center">
                     <Spinner />
                 </div>
             )}
             
             {!isLoading && data.length === 0 && (
-                <div className="p-20 text-center text-gray-500">
+                <div className="p-20 text-center text-gray-400 font-medium">
                     No licenses found. Start by adding one or running the migration.
                 </div>
             )}
         </div>
+
     );
 };
 

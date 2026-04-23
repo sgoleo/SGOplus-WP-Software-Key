@@ -62,6 +62,14 @@ class REST_API extends WP_REST_Controller {
 		) );
 
 		// 2. Internal: License Management (Dashboard)
+		register_rest_route( $this->namespace, '/stats', array(
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_stats' ),
+				'permission_callback' => array( $this, 'check_internal_permission' ),
+			),
+		) );
+
 		register_rest_route( $this->namespace, '/licenses', array(
 			array(
 				'methods'             => WP_REST_Server::READABLE,
@@ -74,6 +82,17 @@ class REST_API extends WP_REST_Controller {
 					'status'   => array( 'sanitize_callback' => 'sanitize_text_field' ),
 					'orderby'  => array( 'default' => 'id', 'sanitize_callback' => 'sanitize_text_field' ),
 					'order'    => array( 'default' => 'desc', 'sanitize_callback' => 'sanitize_text_field' ),
+				),
+			),
+			array(
+				'methods'             => WP_REST_Server::CREATABLE,
+				'callback'            => array( $this, 'create_license' ),
+				'permission_callback' => array( $this, 'check_internal_permission' ),
+				'args'                => array(
+					'product_id'       => array( 'required' => true, 'sanitize_callback' => 'sanitize_text_field' ),
+					'customer_email'   => array( 'required' => true, 'sanitize_callback' => 'sanitize_email' ),
+					'customer_name'    => array( 'sanitize_callback' => 'sanitize_text_field' ),
+					'activation_limit' => array( 'default' => 1, 'sanitize_callback' => 'absint' ),
 				),
 			),
 		) );
@@ -97,6 +116,36 @@ class REST_API extends WP_REST_Controller {
 			array(
 				'methods'             => WP_REST_Server::READABLE,
 				'callback'            => array( $this, 'get_license' ),
+				'permission_callback' => array( $this, 'check_internal_permission' ),
+			),
+			array(
+				'methods'             => WP_REST_Server::DELETABLE,
+				'callback'            => array( $this, 'delete_license' ),
+				'permission_callback' => array( $this, 'check_internal_permission' ),
+			),
+		) );
+
+		register_rest_route( $this->namespace, '/logs', array(
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_logs' ),
+				'permission_callback' => array( $this, 'check_internal_permission' ),
+				'args'                => array(
+					'per_page' => array( 'default' => 20, 'sanitize_callback' => 'absint' ),
+					'page'     => array( 'default' => 1, 'sanitize_callback' => 'absint' ),
+				),
+			),
+		) );
+
+		register_rest_route( $this->namespace, '/settings', array(
+			array(
+				'methods'             => WP_REST_Server::READABLE,
+				'callback'            => array( $this, 'get_settings' ),
+				'permission_callback' => array( $this, 'check_internal_permission' ),
+			),
+			array(
+				'methods'             => WP_REST_Server::EDITABLE,
+				'callback'            => array( $this, 'update_settings' ),
 				'permission_callback' => array( $this, 'check_internal_permission' ),
 			),
 		) );
@@ -129,16 +178,19 @@ class REST_API extends WP_REST_Controller {
 		) );
 
 		if ( ! $license ) {
+			$this->log_event( $license_key, 'error', 'Invalid license key attempt.', $domain );
 			return new WP_Error( 'invalid_license', 'Invalid license key.', array( 'status' => 403 ) );
 		}
 
 		// 2. Validate status
 		if ( 'active' !== $license->status ) {
+			$this->log_event( $license_key, 'error', 'Attempt to activate inactive license.', $domain );
 			return new WP_Error( 'license_inactive', 'License is not active.', array( 'status' => 403 ) );
 		}
 
 		// 3. Check expiration
 		if ( $license->expires_at && strtotime( $license->expires_at ) < time() ) {
+			$this->log_event( $license_key, 'error', 'Attempt to activate expired license.', $domain );
 			return new WP_Error( 'license_expired', 'License has expired.', array( 'status' => 403 ) );
 		}
 
@@ -150,6 +202,7 @@ class REST_API extends WP_REST_Controller {
 		) );
 
 		if ( $existing_domain ) {
+			$this->log_event( $license_key, 'info', 'License already active on this domain.', $domain );
 			return new WP_REST_Response( array(
 				'success' => true,
 				'message' => 'License already active on this domain.',
@@ -159,6 +212,7 @@ class REST_API extends WP_REST_Controller {
 
 		// 5. Check limit
 		if ( $license->activation_count >= $license->activation_limit ) {
+			$this->log_event( $license_key, 'error', 'Activation limit reached.', $domain );
 			return new WP_Error( 'limit_reached', 'Activation limit reached.', array( 'status' => 403 ) );
 		}
 
@@ -175,6 +229,8 @@ class REST_API extends WP_REST_Controller {
 			array( 'activation_count' => $license->activation_count + 1 ),
 			array( 'id' => $license->id )
 		);
+
+		$this->log_event( $license_key, 'success', 'License activated successfully.', $domain );
 
 		return new WP_REST_Response( array(
 			'success' => true,
@@ -285,5 +341,155 @@ class REST_API extends WP_REST_Controller {
 		}
 
 		return new WP_REST_Response( array( 'success' => true, 'message' => 'License updated.' ), 200 );
+	}
+
+	/**
+	 * Callback: Create License (Internal)
+	 */
+	public function create_license( $request ) {
+		global $wpdb;
+		$table = $wpdb->prefix . DB_Schema::LICENSES_TABLE;
+
+		$license_key = 'SWK-' . strtoupper( wp_generate_password( 4, false ) ) . '-' . strtoupper( wp_generate_password( 4, false ) ) . '-' . strtoupper( wp_generate_password( 4, false ) );
+		
+		$data = array(
+			'license_key'      => $license_key,
+			'product_id'       => $request->get_param( 'product_id' ),
+			'customer_email'   => $request->get_param( 'customer_email' ),
+			'customer_name'    => $request->get_param( 'customer_name' ),
+			'activation_limit' => $request->get_param( 'activation_limit' ),
+			'status'           => 'active',
+			'created_at'       => current_time( 'mysql' ),
+		);
+
+		$inserted = $wpdb->insert( $table, $data );
+
+		if ( ! $inserted ) {
+			return new WP_Error( 'db_error', 'Failed to create license.', array( 'status' => 500 ) );
+		}
+
+		$this->log_event( $license_key, 'admin', 'License created manually via dashboard.' );
+
+		return new WP_REST_Response( array( 'success' => true, 'id' => $wpdb->insert_id, 'license_key' => $license_key ), 201 );
+	}
+
+	/**
+	 * Callback: Delete License (Internal)
+	 */
+	public function delete_license( $request ) {
+		global $wpdb;
+		$id = $request->get_param( 'id' );
+		$table_licenses = $wpdb->prefix . DB_Schema::LICENSES_TABLE;
+		$table_domains  = $wpdb->prefix . DB_Schema::DOMAINS_TABLE;
+
+		$license_key = $wpdb->get_var( $wpdb->prepare( "SELECT license_key FROM $table_licenses WHERE id = %d", $id ) );
+		
+		if ( ! $license_key ) {
+			return new WP_Error( 'not_found', 'License not found.', array( 'status' => 404 ) );
+		}
+
+		$wpdb->delete( $table_licenses, array( 'id' => $id ) );
+		$wpdb->delete( $table_domains, array( 'license_id' => $id ) );
+
+		$this->log_event( $license_key, 'admin', 'License and all associated domains deleted.' );
+
+		return new WP_REST_Response( array( 'success' => true ), 200 );
+	}
+
+	/**
+	 * Callback: Get Stats (Internal)
+	 */
+	public function get_stats( $request = null ) {
+		global $wpdb;
+		$licenses_table = $wpdb->prefix . DB_Schema::LICENSES_TABLE;
+		$domains_table  = $wpdb->prefix . DB_Schema::DOMAINS_TABLE;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$active_licenses = $wpdb->get_var( "SELECT COUNT(*) FROM {$licenses_table} WHERE status = 'active'" );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$total_activations = $wpdb->get_var( "SELECT COUNT(*) FROM {$domains_table}" );
+
+		return new WP_REST_Response( array(
+			'active_licenses'   => (int) $active_licenses,
+			'total_activations' => (int) $total_activations,
+			'revenue'           => '$' . number_format( (int) $active_licenses * 29, 2 ),
+			'security_health'   => '99.9%',
+		), 200 );
+	}
+
+	/**
+	 * Callback: Get Logs (Internal)
+	 */
+	public function get_logs( $request ) {
+		global $wpdb;
+		$table = $wpdb->prefix . DB_Schema::LOGS_TABLE;
+
+		$per_page = $request->get_param( 'per_page' );
+		$page     = $request->get_param( 'page' );
+		$offset   = ( $page - 1 ) * $per_page;
+
+		$results = $wpdb->get_results( $wpdb->prepare(
+			"SELECT * FROM $table ORDER BY created_at DESC LIMIT %d OFFSET %d",
+			$per_page, $offset
+		) );
+
+		$total = $wpdb->get_var( "SELECT COUNT(*) FROM $table" );
+
+		$response = new WP_REST_Response( $results, 200 );
+		$response->header( 'X-WP-Total', (int) $total );
+		return $response;
+	}
+
+	/**
+	 * Callback: Get Settings (Internal)
+	 */
+	public function get_settings() {
+		return new WP_REST_Response( array(
+			'enable_logs'      => get_option( 'sgoplus_swk_enable_logs', 'yes' ),
+			'auto_expire_days' => get_option( 'sgoplus_swk_auto_expire_days', 365 ),
+			'api_secret'       => get_option( 'sgoplus_swk_api_secret', wp_generate_password( 32, false ) ),
+		), 200 );
+	}
+
+	/**
+	 * Callback: Update Settings (Internal)
+	 */
+	public function update_settings( $request ) {
+		$params = $request->get_params();
+		
+		if ( isset( $params['enable_logs'] ) ) {
+			update_option( 'sgoplus_swk_enable_logs', sanitize_text_field( $params['enable_logs'] ) );
+		}
+		if ( isset( $params['auto_expire_days'] ) ) {
+			update_option( 'sgoplus_swk_auto_expire_days', absint( $params['auto_expire_days'] ) );
+		}
+		if ( isset( $params['api_secret'] ) ) {
+			update_option( 'sgoplus_swk_api_secret', sanitize_text_field( $params['api_secret'] ) );
+		}
+
+		return new WP_REST_Response( array( 'success' => true ), 200 );
+	}
+
+	/**
+	 * Helper: Log Event
+	 */
+	private function log_event( $license_key, $event_type, $message, $domain = '' ) {
+		global $wpdb;
+		$table = $wpdb->prefix . DB_Schema::LOGS_TABLE;
+
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated
+		$ip         = isset( $_SERVER['REMOTE_ADDR'] ) ? sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) ) : '';
+		// phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotValidated
+		$user_agent = isset( $_SERVER['HTTP_USER_AGENT'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_USER_AGENT'] ) ) : '';
+
+		$wpdb->insert( $table, array(
+			'license_key' => $license_key,
+			'event_type'  => $event_type,
+			'message'     => $message,
+			'domain'      => $domain,
+			'ip_address'  => $ip,
+			'user_agent'  => $user_agent,
+			'created_at'  => current_time( 'mysql' ),
+		) );
 	}
 }

@@ -14,13 +14,16 @@
   }
 }
 
-/* WordPress Admin Specific Fixes */
-#sgoplus-swk-admin-root {
-  @apply antialiased text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900;
-  margin-right: 20px;
-  margin-top: 20px;
+.premium-gradient {
+  background: linear-gradient(135deg, #6c5ce7 0%, #a29bfe 100%);
 }
 
-.premium-gradient {
-  background: linear-gradient(135deg, #0ea5e9 0%, #8b5cf6 100%);
+.glass-card {
+  @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
 }
+
+#sgoplus-swk-admin-root {
+  @apply antialiased text-gray-900 bg-[#f8f9fa] min-h-screen;
+  margin-right: 20px;
+}
+

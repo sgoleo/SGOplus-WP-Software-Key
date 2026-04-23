@@ -22,6 +22,7 @@ class DB_Schema {
 	 */
 	const LICENSES_TABLE = 'sgoplus_swk_licenses';
 	const DOMAINS_TABLE  = 'sgoplus_swk_domains';
+	const LOGS_TABLE     = 'sgoplus_swk_logs';
 
 	/**
 	 * Create/Update database tables.
@@ -32,6 +33,7 @@ class DB_Schema {
 		$charset_collate = $wpdb->get_charset_collate();
 		$licenses_table  = $wpdb->prefix . self::LICENSES_TABLE;
 		$domains_table   = $wpdb->prefix . self::DOMAINS_TABLE;
+		$logs_table      = $wpdb->prefix . self::LOGS_TABLE;
 
 		// 1. Primary License Table
 		// Designed to accommodate legacy lic_key_tbl data
@@ -68,9 +70,25 @@ class DB_Schema {
 			KEY registered_domain (registered_domain(191))
 		) $charset_collate;";
 
+		// 3. Activity Logs Table
+		$sql_logs = "CREATE TABLE $logs_table (
+			id bigint(20) NOT NULL AUTO_INCREMENT,
+			license_key varchar(100) NOT NULL,
+			event_type varchar(50) NOT NULL,
+			message text DEFAULT '' NOT NULL,
+			domain varchar(255) DEFAULT '' NOT NULL,
+			ip_address varchar(45) DEFAULT '' NOT NULL,
+			user_agent text DEFAULT '' NOT NULL,
+			created_at datetime DEFAULT '0000-00-00 00:00:00' NOT NULL,
+			PRIMARY KEY  (id),
+			KEY license_key (license_key),
+			KEY event_type (event_type)
+		) $charset_collate;";
+
 		require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 		dbDelta( $sql_licenses );
 		dbDelta( $sql_domains );
+		dbDelta( $sql_logs );
 
 		// Update version in options
 		update_option( 'sgoplus_swk_db_version', '1.0.0' );
