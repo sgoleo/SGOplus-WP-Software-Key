@@ -63,6 +63,14 @@ function init_plugin() {
 		new Migration_Engine();
 	}
 
+	// Initialize REST API
+	new REST_API();
+
+	// Initialize Admin Dashboard
+	if ( is_admin() ) {
+		new Admin_Dashboard();
+	}
+
 	// Initialize core components here in future steps
 }
 add_action( 'plugins_loaded', __NAMESPACE__ . '\\init_plugin' );

@@ -1,0 +1,26 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    /* Add more variables for shadcn compatibility if needed */
+  }
+
+  body {
+    @apply bg-gray-50 text-gray-900;
+  }
+}
+
+/* WordPress Admin Specific Fixes */
+#sgoplus-swk-admin-root {
+  @apply antialiased text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-900;
+  margin-right: 20px;
+  margin-top: 20px;
+}
+
+.premium-gradient {
+  background: linear-gradient(135deg, #0ea5e9 0%, #8b5cf6 100%);
+}
